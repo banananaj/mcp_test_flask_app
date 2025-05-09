@@ -1,4 +1,6 @@
 import logging
+import random
+import time
 from flask import Flask, render_template_string, request
 
 app = Flask(__name__)
@@ -40,7 +42,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <h2>로그 발생 버튼</h2>
-    <button onclick="triggerLog('info')">INFO 로그 발생</button>
+    <button onclick="triggerLog('info')">거래 발생</button>
     <button onclick="triggerLog('error')">ERROR 로그 발생</button>
     <p id="log-result" style="margin-top:10px; color:green;"></p>
 </body>
@@ -56,10 +58,12 @@ def trigger_log():
     level = request.form.get('level', 'info')
     if level == 'error':
         app.logger.error("❌ ERROR 로그가 발생했습니다.")
-        return "ERROR 로그 발생 완료!"
+        return "ERROR"
     else:
-        app.logger.info("✅ INFO 로그가 발생했습니다.")
-        return "INFO 로그 발생 완료!"
+        delay_ms = random.randint(0, 1000)
+        time.sleep(delay_ms / 1000.0)
+        app.logger.info(f"✅ 거래 발생 (응답시간: {delay_ms}ms)")
+        return f"거래 발생 (응답시간 : {delay_ms}ms)"
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
