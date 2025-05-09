@@ -4,36 +4,42 @@ import time
 from flask import Flask, render_template_string, request
 
 # ✅ OpenTelemetry 관련 import
+import os
 from opentelemetry import trace
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.resources import SERVICE_NAME
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
-# Flask + APM 설정
+# 👉 디버깅용 로그 활성화 (선택)
+os.environ["OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED"] = "true"
+os.environ["OTEL_LOG_LEVEL"] = "debug"
+
+# Flask 앱 정의
 app = Flask(__name__)
 
-# ✅ OpenTelemetry 초기화
-trace.set_tracer_provider(
-    TracerProvider(
-        resource=Resource.create({SERVICE_NAME: "flask-apm"})
-    )
+# ✅ TracerProvider → JaegerExporter 연결
+provider = TracerProvider(
+    resource=Resource.create({SERVICE_NAME: "flask-apm"})
 )
+trace.set_tracer_provider(provider)
+
 jaeger_exporter = JaegerExporter(
-    agent_host_name="43.202.49.44",  # 👈 EC2 A (Jaeger 서버)의 IP 입력
+    agent_host_name="43.202.49.44",  # 👈 여기에 Jaeger 서버 (EC2 A) IP
     agent_port=6831,
 )
+
 span_processor = BatchSpanProcessor(jaeger_exporter)
-trace.get_tracer_provider().add_span_processor(span_processor)
+provider.add_span_processor(span_processor)
+
+# ✅ Flask 자동 계측
 FlaskInstrumentor().instrument_app(app)
 
-# 로깅 설정
+# ✅ 로깅 설정
 def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-
     formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
 
     console_handler = logging.StreamHandler()
@@ -46,7 +52,7 @@ def setup_logging():
 
 setup_logging()
 
-# HTML 템플릿
+# ✅ HTML 템플릿
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -73,16 +79,17 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# ✅ 라우트 정의
 @app.route('/')
 def index():
     return render_template_string(HTML_TEMPLATE)
 
 @app.route('/trigger-log', methods=['POST'])
 def trigger_log():
+    tracer = trace.get_tracer(__name__)
     level = request.form.get('level', 'info')
 
-    # ✅ 명시적인 트레이싱 span 생성
-    tracer = trace.get_tracer(__name__)
+    # ✅ 명시적 span 생성
     with tracer.start_as_current_span("trigger-log-span"):
         if level == 'error':
             app.logger.error("❌ ERROR 로그가 발생했습니다.")
@@ -93,5 +100,6 @@ def trigger_log():
             app.logger.info(f"✅ 거래 발생 (응답시간: {delay_ms}ms)")
             return f"거래 발생 (응답시간 : {delay_ms}ms)"
 
+# ✅ 서버 실행
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
