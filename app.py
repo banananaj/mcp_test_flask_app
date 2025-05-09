@@ -4,33 +4,32 @@ import time
 from flask import Flask, render_template_string, request
 
 # ✅ OpenTelemetry 관련 import
-import os
 from opentelemetry import trace
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-# 👉 디버깅용 로그 활성화 (선택)
-os.environ["OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED"] = "true"
-os.environ["OTEL_LOG_LEVEL"] = "debug"
+# ✅ 로깅 (OpenTelemetry 내부 디버깅용, 선택)
+logging.basicConfig(level=logging.INFO)
 
 # Flask 앱 정의
 app = Flask(__name__)
 
-# ✅ TracerProvider → JaegerExporter 연결
+# ✅ TracerProvider → OTLP Exporter 연결
 provider = TracerProvider(
     resource=Resource.create({SERVICE_NAME: "flask-apm"})
 )
 trace.set_tracer_provider(provider)
 
-jaeger_exporter = JaegerExporter(
-    agent_host_name="43.202.49.44",  # 👈 여기에 Jaeger 서버 (EC2 A) IP
-    agent_port=6831,
+# 👇 OTLP Exporter 설정 (Jaeger OTLP HTTP 수신 포트 사용)
+otlp_exporter = OTLPSpanExporter(
+    endpoint="http://43.202.49.44:4318/v1/traces",  # ← EC2 A (Jaeger 서버) IP
+    insecure=True
 )
 
-span_processor = BatchSpanProcessor(jaeger_exporter)
+span_processor = BatchSpanProcessor(otlp_exporter)
 provider.add_span_processor(span_processor)
 
 # ✅ Flask 자동 계측
