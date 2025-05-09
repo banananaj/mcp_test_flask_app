@@ -18,11 +18,11 @@ app = Flask(__name__)
 # ✅ OpenTelemetry 초기화
 trace.set_tracer_provider(
     TracerProvider(
-        resource=Resource.create({SERVICE_NAME: "flask-apm"})  # 서비스명 지정
+        resource=Resource.create({SERVICE_NAME: "flask-apm"})
     )
 )
 jaeger_exporter = JaegerExporter(
-    agent_host_name="43.202.49.44",  # ← 여기에 Jaeger 서버 IP (예: 3.34.123.45)
+    agent_host_name="EC2_A_PUBLIC_IP",  # 👈 EC2 A (Jaeger 서버)의 IP 입력
     agent_port=6831,
 )
 span_processor = BatchSpanProcessor(jaeger_exporter)
@@ -80,14 +80,18 @@ def index():
 @app.route('/trigger-log', methods=['POST'])
 def trigger_log():
     level = request.form.get('level', 'info')
-    if level == 'error':
-        app.logger.error("❌ ERROR 로그가 발생했습니다.")
-        return "ERROR"
-    else:
-        delay_ms = random.randint(0, 1000)
-        time.sleep(delay_ms / 1000.0)
-        app.logger.info(f"✅ 거래 발생 (응답시간: {delay_ms}ms)")
-        return f"거래 발생 (응답시간 : {delay_ms}ms)"
+
+    # ✅ 명시적인 트레이싱 span 생성
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("trigger-log-span"):
+        if level == 'error':
+            app.logger.error("❌ ERROR 로그가 발생했습니다.")
+            return "ERROR"
+        else:
+            delay_ms = random.randint(0, 1000)
+            time.sleep(delay_ms / 1000.0)
+            app.logger.info(f"✅ 거래 발생 (응답시간: {delay_ms}ms)")
+            return f"거래 발생 (응답시간 : {delay_ms}ms)"
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
