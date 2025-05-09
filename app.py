@@ -9,32 +9,32 @@ from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 
-# ✅ 로깅 (OpenTelemetry 내부 디버깅용, 선택)
+# ✅ 로깅 설정 (디버깅용)
 logging.basicConfig(level=logging.INFO)
 
 # Flask 앱 정의
 app = Flask(__name__)
 
-# ✅ TracerProvider → OTLP Exporter 연결
+# ✅ TracerProvider 및 Jaeger Thrift Exporter 설정 (UDP 6831)
 provider = TracerProvider(
     resource=Resource.create({SERVICE_NAME: "flask-apm"})
 )
 trace.set_tracer_provider(provider)
 
-# ✅ OTLP HTTP Exporter 설정 (insecure=False 제거됨)
-otlp_exporter = OTLPSpanExporter(
-    endpoint="http://43.202.49.44:4318/v1/traces"  # ← EC2 A의 Jaeger 서버 IP
+jaeger_exporter = JaegerExporter(
+    agent_host_name="43.202.49.44",  # ← Jaeger 서버 IP
+    agent_port=6831,
 )
 
-span_processor = BatchSpanProcessor(otlp_exporter)
+span_processor = BatchSpanProcessor(jaeger_exporter)
 provider.add_span_processor(span_processor)
 
 # ✅ Flask 자동 계측
 FlaskInstrumentor().instrument_app(app)
 
-# ✅ 로깅 설정
+# ✅ Flask 로그 파일 및 콘솔 출력 설정
 def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -77,7 +77,6 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# ✅ 라우트 정의
 @app.route('/')
 def index():
     return render_template_string(HTML_TEMPLATE)
@@ -98,6 +97,5 @@ def trigger_log():
             app.logger.info(f"✅ 거래 발생 (응답시간: {delay_ms}ms)")
             return f"거래 발생 (응답시간 : {delay_ms}ms)"
 
-# ✅ 서버 실행
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
