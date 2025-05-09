@@ -3,7 +3,31 @@ import random
 import time
 from flask import Flask, render_template_string, request
 
+# ✅ OpenTelemetry 관련 import
+from opentelemetry import trace
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.resources import SERVICE_NAME
+
+# Flask + APM 설정
 app = Flask(__name__)
+
+# ✅ OpenTelemetry 초기화
+trace.set_tracer_provider(
+    TracerProvider(
+        resource=Resource.create({SERVICE_NAME: "flask-apm"})  # 서비스명 지정
+    )
+)
+jaeger_exporter = JaegerExporter(
+    agent_host_name="43.202.49.44",  # ← 여기에 Jaeger 서버 IP (예: 3.34.123.45)
+    agent_port=6831,
+)
+span_processor = BatchSpanProcessor(jaeger_exporter)
+trace.get_tracer_provider().add_span_processor(span_processor)
+FlaskInstrumentor().instrument_app(app)
 
 # 로깅 설정
 def setup_logging():
