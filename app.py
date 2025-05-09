@@ -23,10 +23,9 @@ provider = TracerProvider(
 )
 trace.set_tracer_provider(provider)
 
-# 👇 OTLP Exporter 설정 (Jaeger OTLP HTTP 수신 포트 사용)
+# ✅ OTLP HTTP Exporter 설정 (insecure=False 제거됨)
 otlp_exporter = OTLPSpanExporter(
-    endpoint="http://43.202.49.44:4318/v1/traces",  # ← EC2 A (Jaeger 서버) IP
-    insecure=True
+    endpoint="http://43.202.49.44:4318/v1/traces"  # ← EC2 A의 Jaeger 서버 IP
 )
 
 span_processor = BatchSpanProcessor(otlp_exporter)
