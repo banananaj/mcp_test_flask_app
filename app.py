@@ -22,7 +22,7 @@ trace.set_tracer_provider(
     )
 )
 jaeger_exporter = JaegerExporter(
-    agent_host_name="EC2_A_PUBLIC_IP",  # 👈 EC2 A (Jaeger 서버)의 IP 입력
+    agent_host_name="43.202.49.44",  # 👈 EC2 A (Jaeger 서버)의 IP 입력
     agent_port=6831,
 )
 span_processor = BatchSpanProcessor(jaeger_exporter)
